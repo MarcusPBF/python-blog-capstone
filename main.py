@@ -46,6 +46,16 @@ class Users(UserMixin, db.Model):
     password: Mapped[str] = mapped_column(String(250), nullable=False)
     name: Mapped[str] = mapped_column(String(250), nullable=False)
 
+# Admin decorator function
+def admin_user(func):
+    @wraps(func)
+    def wrapper_function(*arg, **kwargs):
+        if current_user.id == 1: 
+            return func(*arg, **kwargs)
+        else:
+            abort(403);
+    return wrapper_function
+
 with app.app_context():
     db.create_all()
 
@@ -118,6 +128,7 @@ def get_all_posts():
 
 # TODO: Allow logged-in users to comment on posts
 @app.route("/post/<int:post_id>")
+@login_required
 def show_post(post_id):
     requested_post = db.get_or_404(BlogPost, post_id)
     return render_template("post.html", post=requested_post)
@@ -125,6 +136,8 @@ def show_post(post_id):
 
 # TODO: Use a decorator so only an admin user can create a new post
 @app.route("/new-post", methods=["GET", "POST"])
+@login_required
+@admin_user
 def add_new_post():
     form = CreatePostForm()
     if form.validate_on_submit():
@@ -144,6 +157,8 @@ def add_new_post():
 
 # TODO: Use a decorator so only an admin user can edit a post
 @app.route("/edit-post/<int:post_id>", methods=["GET", "POST"])
+@login_required
+@admin_user
 def edit_post(post_id):
     post = db.get_or_404(BlogPost, post_id)
     edit_form = CreatePostForm(
@@ -166,6 +181,8 @@ def edit_post(post_id):
 
 # TODO: Use a decorator so only an admin user can delete a post
 @app.route("/delete/<int:post_id>")
+@login_required
+@admin_user
 def delete_post(post_id):
     post_to_delete = db.get_or_404(BlogPost, post_id)
     db.session.delete(post_to_delete)
