@@ -3,7 +3,7 @@ from flask import Flask, abort, render_template, redirect, url_for, flash, reque
 from flask_bootstrap import Bootstrap5
 from flask_ckeditor import CKEditor
 from flask_gravatar import Gravatar
-from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user
+from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user, login_required
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String, Text
@@ -51,7 +51,8 @@ with app.app_context():
 
 @login.user_loader
 def load_user(user_id):
-    return Users.get(user_id)
+    user = db.session.execute(db.select(Users).where(Users.id == user_id)).scalar()
+    return user 
 
 # TODO: Use Werkzeug to hash the user's password when creating a new user.
 @app.route('/register', methods=['GET', 'POST'])
@@ -59,6 +60,12 @@ def register():
     form = RegisterForm()
 
     if form.validate_on_submit():
+        user = db.session.execute(db.select(Users).where(Users.email == request.form['email'])).scalar()
+
+        if user is not None:
+            flash("You've already signed up with this email. Log in instead.")
+            return redirect(url_for("login"))
+
         new_user = Users(
             email = request.form['email'],
             password = generate_password_hash(request.form['password']),
@@ -80,14 +87,25 @@ def login():
 
     if form.validate_on_submit():
         user = db.session.execute(db.select(Users).where(Users.email == request.form['email'])).scalar()
-        print(user.name)
-        return redirect(url_for('get_all_posts'))
+
+        if user is None:
+            flash("Email does not exist. Please try again.")
+            return redirect(url_for('login'))
+
+        if not check_password_hash(user.password, request.form['password']):
+            flash("Invalid password. Please try again.")
+            return redirect(url_for('login'))
+        else:
+            login_user(user)
+            return redirect(url_for('get_all_posts')) 
 
     return render_template("login.html", form=form)
 
 
 @app.route('/logout')
+@login_required
 def logout():
+    logout_user()
     return redirect(url_for('get_all_posts'))
 
 
