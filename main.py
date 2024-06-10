@@ -19,6 +19,8 @@ Bootstrap5(app)
 login = LoginManager()
 login.init_app(app)
 
+gravatar = Gravatar(app, size=100, rating='g')
+
 # CREATE DATABASE
 class Base(DeclarativeBase):
     pass
@@ -39,6 +41,7 @@ class BlogPost(db.Model):
     img_url: Mapped[str] = mapped_column(String(250), nullable=False)
     author_id : Mapped[int] = mapped_column(ForeignKey("users.id"))
     user: Mapped["Users"] = relationship(back_populates="blog_posts")
+    comments: Mapped[list["Comments"]] = relationship(back_populates="parent_post")
 
 
 # TODO: Create a User table for all your registered users. 
@@ -48,6 +51,18 @@ class Users(UserMixin, db.Model):
     password: Mapped[str] = mapped_column(String(250), nullable=False)
     name: Mapped[str] = mapped_column(String(250), nullable=False)
     blog_posts: Mapped[list["BlogPost"]] = relationship(back_populates="user")
+    comments: Mapped[list["Comments"]] = relationship(back_populates="author")
+
+# Comments table
+class Comments(db.Model):
+    __tablename__ = "comments"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    author_id : Mapped[int] = mapped_column(ForeignKey("users.id"))
+    author: Mapped["Users"] = relationship(back_populates="comments")
+    post_id : Mapped[int] = mapped_column(ForeignKey("blog_posts.id"))
+    parent_post: Mapped["BlogPost"] = relationship(back_populates="comments")
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+
 
 # Admin decorator function
 def admin_user(func):
@@ -130,12 +145,30 @@ def get_all_posts():
 
 
 # TODO: Allow logged-in users to comment on posts
-@app.route("/post/<int:post_id>")
+@app.route("/post/<int:post_id>", methods=['GET','POST'])
 @login_required
 def show_post(post_id):
     form = CommentForm()
     requested_post = db.get_or_404(BlogPost, post_id)
-    return render_template("post.html", post=requested_post, form=form)
+    all_comments = db.session.execute(db.select(Comments).where(Comments.post_id == post_id)).scalars().all()
+
+    if form.validate_on_submit():
+        if not current_user.is_authenticated:
+            flash("You need to login or register to comment.")
+            return redirect(url_for('login'))
+
+        new_comment = Comments(
+            text = request.form['body'],
+            author = current_user,
+            parent_post = requested_post
+        )
+
+        db.session.add(new_comment)
+        db.session.commit()
+
+        return redirect(url_for('show_post', post_id=post_id))
+
+    return render_template("post.html", post=requested_post, comments=all_comments, form=form)
 
 
 # TODO: Use a decorator so only an admin user can create a new post
