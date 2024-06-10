@@ -1,4 +1,4 @@
-{% include "header.html" %}
+{% include "header.html" %} {% from 'bootstrap/form.html' import render_form %}
 
 <!-- Page Header-->
 <header class="masthead" style="background-image: url('{{post.img_url}}')">
@@ -38,6 +38,8 @@
 
         <!-- Comments Area -->
         <!-- TODO: Add a CKEditor for commenting below -->
+        {{ render_form(form) }} {{ ckeditor.load() }} {{
+        ckeditor.config(name="comment")}}
         <div class="comment">
           <!-- TODO: Show all the comments on a post -->
           <ul class="commentList">

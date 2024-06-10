@@ -9,7 +9,7 @@ from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String, Text, ForeignKey
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
-from forms import CreatePostForm, RegisterForm, LoginForm
+from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
 import os
 
 app = Flask(__name__)
@@ -124,7 +124,6 @@ def logout():
 
 @app.route('/')
 def get_all_posts():
-    print(current_user.id, current_user.name)
     result = db.session.execute(db.select(BlogPost))
     posts = result.scalars().all()
     return render_template("index.html", all_posts=posts)
@@ -134,8 +133,9 @@ def get_all_posts():
 @app.route("/post/<int:post_id>")
 @login_required
 def show_post(post_id):
+    form = CommentForm()
     requested_post = db.get_or_404(BlogPost, post_id)
-    return render_template("post.html", post=requested_post)
+    return render_template("post.html", post=requested_post, form=form)
 
 
 # TODO: Use a decorator so only an admin user can create a new post
